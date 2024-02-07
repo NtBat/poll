@@ -18,6 +18,29 @@ export async function voteOnPoll(app: FastifyInstance) {
 
     let { sessionId } = request.cookies
 
+    if(sessionId) {
+      const userPreviousVoteOnPoll = await prisma.vote.findUnique({
+        where: {
+          sessionId_pollId: {
+            sessionId,
+            pollId
+          }
+        }
+      })
+
+      if(userPreviousVoteOnPoll && userPreviousVoteOnPoll.pollOptionId !== pollOptionId) {
+
+        await prisma.vote.delete({
+          where: {
+            id: userPreviousVoteOnPoll.id
+          }
+        })
+
+      } else if(userPreviousVoteOnPoll) {
+        return reply.status(400).send({ message: 'User already voted on this poll' })
+      }
+    }
+
     if(!sessionId) {    
       sessionId = randomUUID()
 
@@ -28,7 +51,15 @@ export async function voteOnPoll(app: FastifyInstance) {
         httpOnly: true,
       })
     }
-  
-    return reply.status(201).send({ sessionId })
+
+    await prisma.vote.create({
+      data: {
+        pollOptionId,
+        sessionId,
+        pollId
+      }
+    })
+      
+    return reply.status(201).send()
   })
 }
